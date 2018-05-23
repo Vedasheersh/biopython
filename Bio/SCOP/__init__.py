@@ -189,13 +189,10 @@ class Scop(object):
         if filter_by and filter_pat:
             if filter_by=='sccs':
                 filtering = 'sccs'
-            elif filter_by=='description':
-                filtering = 'description'
             else:
-                print 'Can only use sccs or description for filtering'
-                raise RuntimeError('filter_by: {} not supported!'.format(filter_by))
+                raise RuntimeError('filter_by: {} not supported!\nCan only use sccs for filtering'.format(filter_by))
         elif filter_by and not filter_pat or not filter_by and filter_pat:
-            raise RuntimeError('Both filter_by and filter_pat need to be specified!'
+            raise RuntimeError('Both filter_by and filter_pat need to be specified!')
 
         sunidDict = {}
 
@@ -218,6 +215,7 @@ class Scop(object):
 
                 root = Node()
                 domains = []
+                filtered_domains = []
                 root.sunid = 0
                 root.type = 'ro'
                 sunidDict[root.sunid] = root
@@ -228,15 +226,16 @@ class Scop(object):
                 records = Des.parse(des_handle)
                 for record in records:
                     if record.nodetype == 'px':
-                        if filtering=='description':
-                            to_search = record.description
-                        elif filtering=='sccs':
+                        if filtering=='sccs':
                             to_search = record.sccs
                         if filtering:
+                            n = Domain()
+                            n.sid = record.name
+                            domains.append(n)
                             if re.search(filter_pat,to_search):
-                                n = Domain()
-                                n.sid = record.name
-                                domains.append(n)
+                                filtered_domains.append(n)
+                            else:
+                                pass
                         else:
                             n = Domain()
                             n.sid = record.name
@@ -275,8 +274,12 @@ class Scop(object):
                 records = Cla.parse(cla_handle)
                 for record in records:
                     n = sunidDict[record.sunid]
-                    assert n.sccs == record.sccs
-                    assert n.sid == record.sid
+                    try:
+                        assert n.sccs == record.sccs
+                        assert n.sid == record.sid
+                    except AttributeError:
+                        print(n)
+                        print(dir(n))
                     n.residues = record.residues
                     sidDict[n.sid] = n
 
@@ -284,6 +287,7 @@ class Scop(object):
                 self._sunidDict = sunidDict
                 self._sidDict = sidDict
                 self._domains = tuple(domains)
+                self._filtered_domains = tuple(filtered_domains)
 
         finally:
             if dir_path:
@@ -327,6 +331,13 @@ class Scop(object):
             return self.getRoot().getDescendents('px')
         else:
             return self._domains
+    
+    def getFilteredDomains(self):
+        """Return an ordered tuple of all SCOP Domains."""
+        if self.db_handle:
+            return self.getRoot().getDescendents('px')
+        else:
+            return self._filtered_domains
 
     def write_hie(self, handle):
         """Build an HIE SCOP parsable file from this object."""
