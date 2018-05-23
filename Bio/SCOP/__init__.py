@@ -161,7 +161,7 @@ class Scop(object):
     """
 
     def __init__(self, cla_handle=None, des_handle=None, hie_handle=None,
-                 dir_path=None, db_handle=None, version=None):
+                 dir_path=None, db_handle=None, version=None, filter_by=None, filter_pat=None):
         """Build the SCOP hierarchy from the SCOP parsable files, or a sql backend.
 
         If no file handles are given, then a Scop object with a single
@@ -184,6 +184,18 @@ class Scop(object):
         if dir_path is None and db_handle is None:
             if cla_handle is None or des_handle is None or hie_handle is None:
                 raise RuntimeError("Need CLA, DES and HIE files to build SCOP")
+        
+        filtering = False
+        if filter_by and filter_pat:
+            if filter_by=='sccs':
+                filtering = 'sccs'
+            elif filter_by=='description':
+                filtering = 'description'
+            else:
+                print 'Can only use sccs or description for filtering'
+                raise RuntimeError('filter_by: {} not supported!'.format(filter_by))
+        elif filter_by and not filter_pat or not filter_by and filter_pat:
+            raise RuntimeError('Both filter_by and filter_pat need to be specified!'
 
         sunidDict = {}
 
@@ -216,9 +228,19 @@ class Scop(object):
                 records = Des.parse(des_handle)
                 for record in records:
                     if record.nodetype == 'px':
-                        n = Domain()
-                        n.sid = record.name
-                        domains.append(n)
+                        if filtering=='description':
+                            to_search = record.description
+                        elif filtering=='sccs':
+                            to_search = record.sccs
+                        if filtering:
+                            if re.search(filter_pat,to_search):
+                                n = Domain()
+                                n.sid = record.name
+                                domains.append(n)
+                        else:
+                            n = Domain()
+                            n.sid = record.name
+                            domains.append(n)
                     else:
                         n = Node()
                     n.sunid = record.sunid
@@ -875,7 +897,7 @@ def search(pdb=None, key=None, sid=None, disp=None, dir=None, loc=None,
 
 
 def _open(cgi, params=None, get=1):
-    """Open a handle to SCOP, returns an UndoHandle (PRIVATE).
+    """Open a handle to SCOP, returns an UndoHandle.
 
     Open a handle to SCOP.  cgi is the URL for the cgi script to access.
     params is a dictionary with the options to pass to it.  get is a boolean
